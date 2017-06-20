@@ -98,7 +98,7 @@ public class WordChain {
 			}
 		}
 		if (nextWordIndex != -1) {
-			// 続く語句が見つかった場合、次の探索に移る
+			// 続く語句が見つかった場合、配列に1. 語句、2. 今回探索した位置 を記憶し、次の探索に移る
 			usedWordIndex.add(index);
 			HashMap<String, Integer> newWordInfo = new HashMap<String, Integer>();
 			newWordInfo.put("wordIndex", index);
