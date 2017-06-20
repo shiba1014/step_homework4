@@ -8,11 +8,17 @@ import java.util.HashMap;
 public class WordChain {
 	
 	private static BufferedReader bufferedReader;
+	// pages.txtの配列
 	static HashMap<Integer, String> wordMap = new HashMap<Integer, String>();
+	// links.txtの配列
 	static HashMap<Integer, ArrayList<Integer>> linkMap = new HashMap<Integer, ArrayList<Integer>>();
+	// すでに使用された語句のインデックスたち
 	static ArrayList<Integer> usedWordIndex = new ArrayList<Integer>();
+	// 現在のしりとりに使われている単語の情報たち
 	static ArrayList<HashMap<String, Integer>> currentWordChain = new ArrayList<HashMap<String, Integer>>();
+	// 最も長いしりとり
 	static ArrayList<Integer> longestWordChain = new ArrayList<Integer>();
+	// しりとりの一番初めの語句のインデックス
 	static Integer firstWordIndex = 0;
 	
 	public static void readPages(){
