@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import javax.imageio.spi.ServiceRegistry;
+
 public class WordChain {
 	
 	private static BufferedReader bufferedReader;
@@ -15,11 +17,17 @@ public class WordChain {
 	// すでに使用された語句のインデックスたち
 	static ArrayList<Integer> usedWordIndex = new ArrayList<Integer>();
 	// 現在のしりとりに使われている単語の情報たち
-	static ArrayList<HashMap<String, Integer>> currentWordChain = new ArrayList<HashMap<String, Integer>>();
+	static ArrayList<HashMap<String, Integer>> finishSearchWords = new ArrayList<HashMap<String, Integer>>();
 	// 最も長いしりとり
 	static ArrayList<Integer> longestWordChain = new ArrayList<Integer>();
 	// しりとりの一番初めの語句のインデックス
 	static Integer firstWordIndex = 0;
+	
+	static Integer  wordIndex = 0;
+	static Integer restartIndex = 0;
+	
+	public static final String REGLEX = "^[a-zA-Z0-9 -/:-@\\[-\\`\\{-\\~]+$";
+//	public static final String REGLEX = "^[^ -~｡-ﾟ]+$";
 	
 	public static void readPages(){
 		try {
@@ -31,6 +39,7 @@ public class WordChain {
 				String[] line = bufferedReader.readLine().split("\t");
 				wordMap.put(Integer.parseInt(line[0]), line[1]);
 			}
+			System.out.printf("wordMapCount == %d\n", wordMap.size());
 			System.out.println("finish reading pages");
 		} catch (IOException e) {
 			System.out.println(e);
@@ -40,7 +49,7 @@ public class WordChain {
 	public static void readLinks() {
 		try {
 			System.out.println("start reading links");
-			File file = new File("src/wikipedia_links/links_test.txt");
+			File file = new File("src/wikipedia_links/links.txt");
 			FileReader fileReader = new FileReader(file);
 			bufferedReader = new BufferedReader(fileReader);
 			Integer currentIndex = 0;
@@ -65,64 +74,75 @@ public class WordChain {
 		}
 	}
 	
-	public static void initArray() {
-		usedWordIndex.add(0);
-		HashMap<String, Integer> wordInfo = new HashMap<String, Integer>();
-		wordInfo.put("wordIndex", 0);
-		wordInfo.put("restartIndex", 0);
-		currentWordChain.add(wordInfo);
-	}
+public static void searchWordChain() {
 	
-	public static void searchWordChain(Integer index, Integer from) {
+		usedWordIndex.add(0);
 		
-		String word = wordMap.get(index);
-		Character lastChar = getLastChar(word);
-		ArrayList<Integer> link = linkMap.get(index);
-		Integer nextWordIndex = -1;
-		Integer restartIndex = 0;
-		
-		// 続く語句を探索
-		for (int i = from; i < link.size(); i++) {
-			// すでに使われている語句を除く
-			if (usedWordIndex.contains(i)) {
+		while(true){
+			String word = wordMap.get(wordIndex);
+			if (word.matches(REGLEX)) {
+				undo();
 				continue;
 			}
-			String secondWord = wordMap.get(link.get(i));
-			Character firstChar = getLastChar(secondWord);
-			if (firstChar == lastChar) {
-				System.out.println("yeah");
-				// 次に探索する単語のインデックスと、戻ってきた際に探索を再開するインデックスを取得
-				nextWordIndex = link.get(i);
-				restartIndex = i;
-				break;
+			Character lastChar = getLastChar(word);
+			ArrayList<Integer> link = linkMap.get(wordIndex);
+			if (link == null) {
+				undo();
+				continue;
 			}
-		}
-		if (nextWordIndex != -1) {
-			// 続く語句が見つかった場合、配列に1. 語句、2. 今回探索した位置 を記憶し、次の探索に移る
-			usedWordIndex.add(index);
-			HashMap<String, Integer> newWordInfo = new HashMap<String, Integer>();
-			newWordInfo.put("wordIndex", index);
-			newWordInfo.put("restartIndex", restartIndex);
-			// しりとりの長さが最大だった場合、記録を更新
-			if (currentWordChain.size() > longestWordChain.size()) {
-				longestWordChain.clear();
-				for (Integer i : usedWordIndex) {
-					longestWordChain.add(i);
+			Integer nextWordIndex = -1;
+			// 続く語句を探索 ========================================================
+			for (int i = restartIndex; i < link.size(); i++) {
+				// すでに使われている語句を除く
+				if (usedWordIndex.contains(link.get(i))) {
+					continue;
+				}
+				
+				String nextWord = wordMap.get(link.get(i));
+				if (nextWord.matches(REGLEX)) {
+					continue;
+				}
+				Character firstChar = getFirstChar(nextWord);
+				if (firstChar == lastChar) {
+//					System.out.println("find word chain");
+					// 次に探索する単語のインデックスと、戻ってきた際に探索を再開するインデックスを取得
+					nextWordIndex = link.get(i);
+					restartIndex = i+1;
+					
+					if(usedWordIndex.size() > 1){
+						String result = "";
+						for (Integer index : usedWordIndex) {
+							result += wordMap.get(index);
+							result += " -> ";
+						}
+						System.out.println(result);
+					}
+					break;
 				}
 			}
-			searchWordChain(nextWordIndex, 0);
-		} else {
-			// 続く語句が見つからなかった場合
-			usedWordIndex.remove(usedWordIndex.size() - 1);
-			currentWordChain.remove(currentWordChain.size() - 1);
-			if (currentWordChain.size() == 0) {
-				// 初めの位置まで戻ってきた場合、次のインデックスを探索する
-				firstWordIndex++;
-				searchWordChain(firstWordIndex,0);
+			// =====================================================================
+			
+			if (nextWordIndex != -1) {
+				usedWordIndex.add(nextWordIndex);
+				// 続く語句が見つかった場合、配列に1. 今回の語句、2. 今回探索した位置 を記憶し、次の探索に移る
+				HashMap<String, Integer> newWordInfo = new HashMap<String, Integer>();
+				newWordInfo.put("wordIndex", wordIndex);
+				newWordInfo.put("restartIndex", restartIndex);
+				finishSearchWords.add(newWordInfo);
+				// しりとりの長さが最大だった場合、記録を更新
+				if (usedWordIndex.size() > longestWordChain.size()) {
+					longestWordChain.clear();
+					for (Integer i : usedWordIndex) {
+						longestWordChain.add(i);
+					}
+				}
+				wordIndex = nextWordIndex;
+				restartIndex = 0;
 			} else {
-				// 前回のところから探索を再開する
-				HashMap<String, Integer> lastWordInfo = currentWordChain.get(currentWordChain.size() - 1);
-				searchWordChain(lastWordInfo.get("wordIndex"), lastWordInfo.get("restartIndex"));
+				if (usedWordIndex.size() == 0) {
+					return;
+				}
+				undo();
 			}
 		}
 	}
@@ -137,13 +157,79 @@ public class WordChain {
 		return firstChar;
 	}
 	
+	public static void undo() {
+		// 続く語句が見つからなかった場合
+		usedWordIndex.remove(usedWordIndex.size() - 1);
+		if (usedWordIndex.size() == 0) {
+		// 初めの位置まで戻ってきた場合、次のインデックスを探索する
+			firstWordIndex++;
+//			System.out.printf("firstWordIndex == %d\n", firstWordIndex);
+			if (firstWordIndex == wordMap.size()){
+				return;
+			}
+				usedWordIndex.add(firstWordIndex);
+				finishSearchWords.clear();
+				wordIndex = firstWordIndex;
+				restartIndex = 0;
+			} else {
+				// 前回のところから探索を再開する
+				HashMap<String, Integer> lastWordInfo = finishSearchWords.get(finishSearchWords.size() - 1);
+				wordIndex = lastWordInfo.get("wordIndex");
+				restartIndex = lastWordInfo.get("restartIndex");
+				finishSearchWords.remove(finishSearchWords.size() - 1);
+			}
+	}
+	
+	public static void prepareTest(){
+		wordMap.put(0, "egg");
+		wordMap.put(1, "apple");
+		wordMap.put(2, "lemon");
+		wordMap.put(3, "tomato");
+		
+		ArrayList<Integer> test = new ArrayList<>();
+		test.add(1);
+		test.add(2);
+		test.add(3);
+
+		ArrayList<Integer> test2 = new ArrayList<>();
+		test2.add(0);
+		test2.add(2);
+		test2.add(3);
+		
+		ArrayList<Integer> test3 = new ArrayList<>();
+		test3.add(0);
+		test3.add(1);
+		test3.add(3);
+		
+		ArrayList<Integer> test4 = new ArrayList<>();
+		test4.add(0);
+		test4.add(1);
+		test4.add(2);
+		
+		linkMap.put(0, test);
+		linkMap.put(1, test2);
+		linkMap.put(2, test3);
+		linkMap.put(3, test4);
+	}
+	
 	public static void main(String args[]){
+		
 		readPages();
 		readLinks();
-		initArray();
 		System.out.println("start word chain");		
-		searchWordChain(firstWordIndex, 0);
+		searchWordChain();
 		System.out.println("finish word chain");
+		
+		// TEST CODE
+//		prepareTest();
+//		searchWordChain();
+		
 		System.out.println(longestWordChain);
+		String result = "";
+		for (Integer index : longestWordChain) {
+			result += wordMap.get(index);
+			result += " -> ";
+		}
+		System.out.println(result);
 	}
 }
